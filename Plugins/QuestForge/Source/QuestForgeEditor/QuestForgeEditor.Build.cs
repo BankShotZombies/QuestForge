@@ -19,7 +19,9 @@ public class QuestForgeEditor : ModuleRules
 			"Slate",
 			"SlateCore",
 			"UnrealEd",
-			"EditorFramework"
+			"EditorFramework",
+			"EditorStyle",
+			"AssetTools"
 		});
 	}
 }

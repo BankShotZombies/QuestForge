@@ -4,6 +4,8 @@
 
 #include "Modules/ModuleManager.h"
 
+class FAssetTypeActions_QuestAsset;
+
 class FQuestForgeEditorModule : public IModuleInterface
 {
 public:
@@ -11,4 +13,7 @@ public:
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
+
+private:
+	TSharedPtr<FAssetTypeActions_QuestAsset> QuestAssetTypeActions;
 };
