@@ -49,11 +49,6 @@ void UQuestGraphNode::SyncNodePositionToAsset() const
 
 void UQuestGraphNode::SyncTransitionsToAsset()
 {
-	if(!QuestAsset)
-	{
-		return;
-	}
-
 	FQuestNode* Node = QuestAsset->FindNodeById(NodeId);
 	if(!Node)
 	{
@@ -86,7 +81,9 @@ void UQuestGraphNode::SyncTransitionsToAsset()
 			continue;
 		}
 
-		Node->Transitions.Add(TargetNode->NodeId);
+		FQuestTransition NewTransition;
+		NewTransition.TargetNodeId = TargetNode->NodeId;
+		Node->Transitions.Add(NewTransition);
 	}
 
 	QuestAsset->MarkPackageDirty();

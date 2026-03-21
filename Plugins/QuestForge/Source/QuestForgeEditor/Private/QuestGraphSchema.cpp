@@ -3,9 +3,47 @@
 
 #include "QuestGraphSchema.h"
 
+#include "QuestAssetEditor.h"
+#include "QuestGraph.h"
+
+UEdGraphNode* FQuestGraphSchemaAction_NewNode::PerformAction(UEdGraph* ParentGraph, UEdGraphPin* FromPin,
+                                                             const FVector2D Location, bool bSelectNewNode)
+{
+	if (!ParentGraph)
+	{
+		return nullptr;
+	}
+
+	if (UQuestGraph* QuestGraph = Cast<UQuestGraph>(ParentGraph))
+	{
+		if (TSharedPtr<FQuestAssetEditor> Editor = QuestGraph->Editor.Pin())
+		{
+			Editor->CreateNodeAtLocation(Location);
+		}
+	}
+
+	return nullptr;
+}
+
 void UQuestGraphSchema::GetContextMenuActions(UToolMenu* Menu, UGraphNodeContextMenuContext* Context) const
 {
 	Super::GetContextMenuActions(Menu, Context);
+}
+
+void UQuestGraphSchema::GetGraphContextActions(FGraphContextMenuBuilder& ContextMenuBuilder) const
+{
+	if (!ContextMenuBuilder.CurrentGraph)
+	{
+		return;
+	}
+
+	if (ContextMenuBuilder.FromPin == nullptr)
+	{
+		TSharedPtr<FQuestGraphSchemaAction_NewNode> AddNodeAction =
+			MakeShared<FQuestGraphSchemaAction_NewNode>();
+
+		ContextMenuBuilder.AddAction(AddNodeAction);
+	}
 }
 
 const FPinConnectionResponse UQuestGraphSchema::CanCreateConnection(const UEdGraphPin* A, const UEdGraphPin* B) const

@@ -4,12 +4,13 @@
 #include "Toolkits/AssetEditorToolkit.h"
 #include "UObject/GCObject.h"
 
+class UQuestNodeDetailsProxy;
 class UQuestAsset;
 class UQuestGraph;
 class IDetailsView;
 class SGraphEditor;
 
-class FQuestAssetEditor : public FAssetEditorToolkit, public FGCObject
+class QUESTFORGEEDITOR_API FQuestAssetEditor : public FAssetEditorToolkit, public FGCObject
 {
 public:
 
@@ -34,6 +35,14 @@ public:
 	virtual void RegisterTabSpawners(const TSharedRef<FTabManager>& InTabManager) override;
 	virtual void UnregisterTabSpawners(const TSharedRef<FTabManager>& InTabManager) override;
 
+	virtual void SaveAsset_Execute() override;
+
+	/* Creates a new quest node at the given graph position. */
+	void CreateNodeAtLocation(const FVector2D& GraphPosition);
+
+	/** Refreshes the graph after a node's editable data has changed. */
+	void RefreshGraphAfterNodeEdit();
+
 private:
 	/* The quest asset currently being edited. */
 	TObjectPtr<UQuestAsset> QuestAsset;
@@ -47,6 +56,10 @@ private:
 	/* Graph editor widget used to display and edit quest nodes visually. */
 	TSharedPtr<IDetailsView> DetailsView;
 
+	TSharedPtr<FUICommandList> GraphEditorCommands;
+
+	TObjectPtr<UQuestNodeDetailsProxy> NodeDetailsProxy;
+
 	bool bIsRebuildingGraph = false;
 
 private:
@@ -54,20 +67,29 @@ private:
 	/* Creates the internal graph object used by the graph editor widget. */
 	void CreateInternalGraph();
 
-	/* Rebuilds all graph nodes and edges from the quest asset's runtime data. */
-	void RebuildGraphFromAsset();
-
 	/* Creates graph nodes for each FQuestNode in the asset. */
 	void CreateGraphNodes();
 
 	/* Creates graph links based on each node's outgoing transition GUIDs. */
 	void CreateGraphEdges();
 
-	/* Creates a new quest node at the given graph position. */
-	void CreateNodeAtLocation(const FVector2D& GraphPosition);
+	/* Rebuilds all graph nodes and edges from the quest asset's runtime data. */
+	void RebuildGraphFromAsset();
+
+	/* Binds editor commands such as deleting the currently selected graph nodes. */
+	void BindEditorCommands();
+
+	/* Returns whether there are any selected graph nodes that can currently be deleted. */
+	bool CanDeleteSelectedNodes() const;
+
+	/* Deletes the currently selected graph nodes and removes any transitions pointing to them. */
+	void DeleteSelectedNodes();
 
 	/* Saves all graph node positions back into the corresponding runtime quest nodes. */
 	void SyncAllGraphNodePositionsToAsset();
+
+	/* Saves the currently edited node proxy back into the quest asset, if one exists. */
+	void SaveCurrentNodeDetailsProxy();
 
 	/* Handles selection changes in the graph editor and updates the details panel. */
 	void OnSelectedNodesChanged(const TSet<UObject*>& NewSelection);

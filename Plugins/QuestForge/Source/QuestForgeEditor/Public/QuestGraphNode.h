@@ -15,10 +15,10 @@ class QUESTFORGEEDITOR_API UQuestGraphNode : public UEdGraphNode
 
 public:
 
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, Category="Quest")
 	TObjectPtr<UQuestAsset> QuestAsset;
 
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, Category="Quest")
 	FGuid NodeId;
 
 	void Initialize(UQuestAsset* InQuestAsset, const FGuid& InNodeId);

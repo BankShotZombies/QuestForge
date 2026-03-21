@@ -4,6 +4,8 @@
 #include "QuestGraph.h"
 #include "QuestGraphNode.h"
 #include "QuestGraphSchema.h"
+#include "QuestNodeDetailsProxy.h"
+#include "Framework/Commands/GenericCommands.h"
 
 const FName FQuestAssetEditor::GraphTabID(TEXT("QuestGraph"));
 const FName FQuestAssetEditor::DetailsTabID(TEXT("QuestDetails"));
@@ -22,14 +24,17 @@ void FQuestAssetEditor::InitQuestAssetEditor(const EToolkitMode::Type Mode,
 
 	FDetailsViewArgs DetailsArgs;
 	DetailsView = PropertyEditorModule.CreateDetailView(DetailsArgs);
+	DetailsView->SetObject(QuestAsset.Get());
 
 	FGraphAppearanceInfo AppearanceInfo;
 	AppearanceInfo.CornerText = FText::FromString(TEXT("QuestForge"));
 
+	BindEditorCommands();
+
 	SGraphEditor::FGraphEditorEvents GraphEvents;
 	GraphEvents.OnSelectionChanged = SGraphEditor::FOnSelectionChanged::CreateRaw(this, &FQuestAssetEditor::OnSelectedNodesChanged);
 
-	GraphEditorWidget = SNew(SGraphEditor).Appearance(AppearanceInfo).GraphToEdit(Graph).GraphEvents(GraphEvents);
+	GraphEditorWidget = SNew(SGraphEditor).AdditionalCommands(GraphEditorCommands).Appearance(AppearanceInfo).GraphToEdit(Graph).GraphEvents(GraphEvents);
 
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("QuestAssetEditorLayout")
 	->AddArea
@@ -79,6 +84,7 @@ void FQuestAssetEditor::AddReferencedObjects(FReferenceCollector& Collector)
 {
 	Collector.AddReferencedObject(QuestAsset);
 	Collector.AddReferencedObject(Graph);
+	Collector.AddReferencedObject(NodeDetailsProxy);
 }
 
 void FQuestAssetEditor::RegisterTabSpawners(const TSharedRef<FTabManager>& InTabManager)
@@ -97,10 +103,18 @@ void FQuestAssetEditor::UnregisterTabSpawners(const TSharedRef<FTabManager>& InT
 	InTabManager->UnregisterTabSpawner(DetailsTabID);
 }
 
+void FQuestAssetEditor::SaveAsset_Execute()
+{
+	SaveCurrentNodeDetailsProxy();
+	SyncAllGraphNodePositionsToAsset();
+	FAssetEditorToolkit::SaveAsset_Execute();
+}
+
 void FQuestAssetEditor::CreateInternalGraph()
 {
 	Graph = NewObject<UQuestGraph>(QuestAsset.Get(), NAME_None, RF_Transactional);
 	Graph->Schema = UQuestGraphSchema::StaticClass();
+	Graph->Editor = SharedThis(this);
 }
 
 void FQuestAssetEditor::RebuildGraphFromAsset()
@@ -163,9 +177,9 @@ void FQuestAssetEditor::CreateGraphEdges()
 			continue;
 		}
 
-		for(const FGuid& TargetNodeId : Node.Transitions)
+		for(const FQuestTransition& Transition : Node.Transitions)
 		{
-			UQuestGraphNode** TargetNodePtr = NodeMap.Find(TargetNodeId);
+			UQuestGraphNode** TargetNodePtr = NodeMap.Find(Transition.TargetNodeId);
 			if(!TargetNodePtr)
 			{
 				continue;
@@ -181,6 +195,14 @@ void FQuestAssetEditor::CreateGraphEdges()
 			OutputPin->MakeLinkTo(InputPin);
 		}
 	}
+}
+
+void FQuestAssetEditor::BindEditorCommands()
+{
+	GraphEditorCommands = MakeShared<FUICommandList>();
+
+	GraphEditorCommands->MapAction(FGenericCommands::Get().Delete, FExecuteAction::CreateRaw(this, &FQuestAssetEditor::DeleteSelectedNodes),
+		FCanExecuteAction::CreateRaw(this, &FQuestAssetEditor::CanDeleteSelectedNodes));
 }
 
 void FQuestAssetEditor::CreateNodeAtLocation(const FVector2D& GraphPosition)
@@ -202,6 +224,66 @@ void FQuestAssetEditor::CreateNodeAtLocation(const FVector2D& GraphPosition)
 	RebuildGraphFromAsset();
 }
 
+void FQuestAssetEditor::RefreshGraphAfterNodeEdit()
+{
+	// TODO: If node name is the only thing to refresh in the graph, can I just do that instead of rebuilding the whole graph? 
+	RebuildGraphFromAsset();
+}
+
+void FQuestAssetEditor::SaveCurrentNodeDetailsProxy()
+{
+	if(NodeDetailsProxy)
+	{
+		NodeDetailsProxy->SaveToNode();
+	}
+}
+
+bool FQuestAssetEditor::CanDeleteSelectedNodes() const
+{
+	return GraphEditorWidget.IsValid() && GraphEditorWidget->GetSelectedNodes().Num() > 0;
+}
+
+void FQuestAssetEditor::DeleteSelectedNodes()
+{
+	const FGraphPanelSelectionSet SelectedNodes = GraphEditorWidget->GetSelectedNodes();
+
+	TSet<FGuid> DeletedNodeIds;
+
+	for(UObject* SelectedObject : SelectedNodes)
+	{
+		if (UQuestGraphNode* QuestGraphNode = Cast<UQuestGraphNode>(SelectedObject))
+		{
+			DeletedNodeIds.Add(QuestGraphNode->NodeId);
+		}
+	}
+
+	if(DeletedNodeIds.Num() == 0)
+	{
+		return;
+	}
+
+	QuestAsset->Modify();
+
+	QuestAsset->Nodes.RemoveAll([&](const FQuestNode& Node)
+	{
+		return DeletedNodeIds.Contains(Node.NodeId);
+	});
+
+	for(FQuestNode& Node : QuestAsset->Nodes)
+	{
+		Node.Transitions.RemoveAll([&](const FQuestTransition& Transition)
+		{
+			return DeletedNodeIds.Contains(Transition.TargetNodeId);
+		});
+	}
+
+	QuestAsset->MarkPackageDirty();
+
+	RebuildGraphFromAsset();
+	DetailsView->SetObject(QuestAsset.Get());
+
+}
+
 void FQuestAssetEditor::SyncAllGraphNodePositionsToAsset()
 {
 	for(UEdGraphNode* EdNode : Graph->Nodes)
@@ -215,15 +297,24 @@ void FQuestAssetEditor::SyncAllGraphNodePositionsToAsset()
 
 void FQuestAssetEditor::OnSelectedNodesChanged(const TSet<UObject*>& NewSelection)
 {
+	SaveCurrentNodeDetailsProxy();
+	
 	if(NewSelection.Num() == 1)
 	{
 		for(UObject* SelectedObject : NewSelection)
 		{
-			DetailsView->SetObject(SelectedObject);
-			return;
+			if(UQuestGraphNode* QuestGraphNode = Cast<UQuestGraphNode>(SelectedObject))
+			{
+				NodeDetailsProxy = NewObject<UQuestNodeDetailsProxy>();
+				NodeDetailsProxy->Editor = SharedThis(this);
+				NodeDetailsProxy->LoadFromNode(QuestAsset, QuestGraphNode->NodeId);
+				DetailsView->SetObject(NodeDetailsProxy);
+				return;
+			}
 		}
 	}
 
+	NodeDetailsProxy = nullptr;
 	DetailsView->SetObject(QuestAsset);
 }
 

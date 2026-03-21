@@ -16,7 +16,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quest")
 	FName QuestName;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category= "Quest")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category= "Quest")
 	TArray<FQuestNode> Nodes;
 
 	FQuestNode* FindNodeById(const FGuid& NodeId);

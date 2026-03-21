@@ -13,5 +13,9 @@ UCLASS()
 class QUESTFORGEEDITOR_API UQuestGraph : public UEdGraph
 {
 	GENERATED_BODY()
+
+public:
+
+	TWeakPtr<class FQuestAssetEditor> Editor;
 	
 };

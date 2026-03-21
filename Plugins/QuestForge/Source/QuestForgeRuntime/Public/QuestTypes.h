@@ -30,6 +30,18 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct FQuestTransition
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGuid TargetNodeId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FQuestCondition> Preconditions;
+};
+
+USTRUCT(BlueprintType)
 struct FQuestEffect
 {
 	GENERATED_BODY()
@@ -57,10 +69,7 @@ public:
 	FGuid NodeId;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
-	TArray<FGuid> Transitions;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
-	TArray<FQuestCondition> Preconditions;
+	TArray<FQuestTransition> Transitions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	TArray<FQuestEffect> Effects;

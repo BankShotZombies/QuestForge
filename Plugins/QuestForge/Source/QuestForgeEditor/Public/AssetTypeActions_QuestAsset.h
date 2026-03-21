@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "AssetTypeActions_Base.h"
 
-class FAssetTypeActions_QuestAsset : public FAssetTypeActions_Base
+class QUESTFORGEEDITOR_API FAssetTypeActions_QuestAsset : public FAssetTypeActions_Base
 {
 public:
 	// Returns the display name shown for this asset type in the editor.
