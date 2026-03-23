@@ -4,7 +4,7 @@
 #include "Toolkits/AssetEditorToolkit.h"
 #include "UObject/GCObject.h"
 
-class UQuestNodeDetailsProxy;
+class UQuestNodeEditorProxy;
 class UQuestAsset;
 class UQuestGraph;
 class IDetailsView;
@@ -58,9 +58,7 @@ private:
 
 	TSharedPtr<FUICommandList> GraphEditorCommands;
 
-	TObjectPtr<UQuestNodeDetailsProxy> NodeDetailsProxy;
-
-	bool bIsRebuildingGraph = false;
+	TObjectPtr<UQuestNodeEditorProxy> NodeDetailsProxy;
 
 private:
 

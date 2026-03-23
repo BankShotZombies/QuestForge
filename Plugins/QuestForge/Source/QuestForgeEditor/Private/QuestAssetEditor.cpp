@@ -4,7 +4,7 @@
 #include "QuestGraph.h"
 #include "QuestGraphNode.h"
 #include "QuestGraphSchema.h"
-#include "QuestNodeDetailsProxy.h"
+#include "QuestNodeEditorProxy.h"
 #include "Framework/Commands/GenericCommands.h"
 
 const FName FQuestAssetEditor::GraphTabID(TEXT("QuestGraph"));
@@ -22,6 +22,7 @@ void FQuestAssetEditor::InitQuestAssetEditor(const EToolkitMode::Type Mode,
 
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
+	// Initialize the details panel to show asset-level properties by default.
 	FDetailsViewArgs DetailsArgs;
 	DetailsView = PropertyEditorModule.CreateDetailView(DetailsArgs);
 	DetailsView->SetObject(QuestAsset.Get());
@@ -31,11 +32,13 @@ void FQuestAssetEditor::InitQuestAssetEditor(const EToolkitMode::Type Mode,
 
 	BindEditorCommands();
 
+	// Wire graph selection events into the details/proxy selection flow.
 	SGraphEditor::FGraphEditorEvents GraphEvents;
 	GraphEvents.OnSelectionChanged = SGraphEditor::FOnSelectionChanged::CreateRaw(this, &FQuestAssetEditor::OnSelectedNodesChanged);
 
 	GraphEditorWidget = SNew(SGraphEditor).AdditionalCommands(GraphEditorCommands).Appearance(AppearanceInfo).GraphToEdit(Graph).GraphEvents(GraphEvents);
-
+	
+	// Build the editor layout with a graph workspace and a right-side details panel.
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("QuestAssetEditorLayout")
 	->AddArea
 	(
@@ -112,6 +115,7 @@ void FQuestAssetEditor::SaveAsset_Execute()
 
 void FQuestAssetEditor::CreateInternalGraph()
 {
+	// Create the transient editor graph that mirrors the serialized quest asset while the editor is open.
 	Graph = NewObject<UQuestGraph>(QuestAsset.Get(), NAME_None, RF_Transactional);
 	Graph->Schema = UQuestGraphSchema::StaticClass();
 	Graph->Editor = SharedThis(this);
@@ -124,19 +128,17 @@ void FQuestAssetEditor::RebuildGraphFromAsset()
 		return;
 	}
 
-	bIsRebuildingGraph = true;
-
+	// Clear and rebuild graph contents from serialized quest data.
 	Graph->Modify();
 	Graph->Nodes.Reset();
 
 	CreateGraphNodes();
 	CreateGraphEdges();
-
-	bIsRebuildingGraph = false;
 }
 
 void FQuestAssetEditor::CreateGraphNodes()
 {
+	// Create one editor graph node for each serialized quest node.
 	for(const FQuestNode& Node : QuestAsset->Nodes)
 	{
 		UQuestGraphNode* GraphNode = NewObject<UQuestGraphNode>(Graph, NAME_None, RF_Transactional);
@@ -152,12 +154,14 @@ void FQuestAssetEditor::CreateGraphNodes()
 
 void FQuestAssetEditor::CreateGraphEdges()
 {
+	// Index graph nodes by runtime node id so transitions can relink by GUID.
 	TMap<FGuid, UQuestGraphNode*> NodeMap;
 
 	for(UEdGraphNode* EdNode : Graph->Nodes)
 	{
 		if(UQuestGraphNode* QuestGraphNode = Cast<UQuestGraphNode>(EdNode))
 		{
+			// Map runtime node id to graph node instance for fast transition lookups.
 			NodeMap.Add(QuestGraphNode->NodeId, QuestGraphNode);
 		}
 	}
@@ -177,6 +181,7 @@ void FQuestAssetEditor::CreateGraphEdges()
 			continue;
 		}
 
+		// Recreate each serialized transition as a live pin link between source and target graph nodes.
 		for(const FQuestTransition& Transition : Node.Transitions)
 		{
 			UQuestGraphNode** TargetNodePtr = NodeMap.Find(Transition.TargetNodeId);
@@ -214,6 +219,7 @@ void FQuestAssetEditor::CreateNodeAtLocation(const FVector2D& GraphPosition)
 
 	QuestAsset->Modify();
 
+	// Add a new serialized quest node and seed its initial graph position.
 	FQuestNode& NewNode = QuestAsset->Nodes.AddDefaulted_GetRef();
 	NewNode.NodeId = FGuid::NewGuid();
 	NewNode.NodeName = TEXT("NewNode");
@@ -232,6 +238,7 @@ void FQuestAssetEditor::RefreshGraphAfterNodeEdit()
 
 void FQuestAssetEditor::SaveCurrentNodeDetailsProxy()
 {
+	// Commit the currently edited node proxy back into the asset before changing context.
 	if(NodeDetailsProxy)
 	{
 		NodeDetailsProxy->SaveToNode();
@@ -253,6 +260,7 @@ void FQuestAssetEditor::DeleteSelectedNodes()
 	{
 		if (UQuestGraphNode* QuestGraphNode = Cast<UQuestGraphNode>(SelectedObject))
 		{
+			// Convert selected graph nodes into runtime node ids for asset-side deletion.
 			DeletedNodeIds.Add(QuestGraphNode->NodeId);
 		}
 	}
@@ -269,6 +277,7 @@ void FQuestAssetEditor::DeleteSelectedNodes()
 		return DeletedNodeIds.Contains(Node.NodeId);
 	});
 
+	// Strip any transitions that still target deleted nodes.
 	for(FQuestNode& Node : QuestAsset->Nodes)
 	{
 		Node.Transitions.RemoveAll([&](const FQuestTransition& Transition)
@@ -280,6 +289,7 @@ void FQuestAssetEditor::DeleteSelectedNodes()
 	QuestAsset->MarkPackageDirty();
 
 	RebuildGraphFromAsset();
+	// Fall back to asset-level details once selected nodes no longer exist.
 	DetailsView->SetObject(QuestAsset.Get());
 
 }
@@ -297,6 +307,7 @@ void FQuestAssetEditor::SyncAllGraphNodePositionsToAsset()
 
 void FQuestAssetEditor::OnSelectedNodesChanged(const TSet<UObject*>& NewSelection)
 {
+	// Persist pending details edits before swapping selection targets.
 	SaveCurrentNodeDetailsProxy();
 	
 	if(NewSelection.Num() == 1)
@@ -305,7 +316,8 @@ void FQuestAssetEditor::OnSelectedNodesChanged(const TSet<UObject*>& NewSelectio
 		{
 			if(UQuestGraphNode* QuestGraphNode = Cast<UQuestGraphNode>(SelectedObject))
 			{
-				NodeDetailsProxy = NewObject<UQuestNodeDetailsProxy>();
+				// Use a proxy object so details edits can be staged and committed on selection changes.
+				NodeDetailsProxy = NewObject<UQuestNodeEditorProxy>();
 				NodeDetailsProxy->Editor = SharedThis(this);
 				NodeDetailsProxy->LoadFromNode(QuestAsset, QuestGraphNode->NodeId);
 				DetailsView->SetObject(NodeDetailsProxy);
@@ -314,6 +326,7 @@ void FQuestAssetEditor::OnSelectedNodesChanged(const TSet<UObject*>& NewSelectio
 		}
 	}
 
+	// Show asset details when selection is empty or not a single quest node.
 	NodeDetailsProxy = nullptr;
 	DetailsView->SetObject(QuestAsset);
 }

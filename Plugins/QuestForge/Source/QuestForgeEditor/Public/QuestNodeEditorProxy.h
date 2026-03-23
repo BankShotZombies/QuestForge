@@ -3,10 +3,28 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QuestNodeDetailsProxy.generated.h"
+#include "QuestNodeEditorProxy.generated.h"
+
+USTRUCT()
+struct FQuestTransitionEditorData
+{
+	GENERATED_BODY()
+
+	/** The runtime node id this transition points to. */
+	UPROPERTY(VisibleAnywhere, Category = "Quest")
+	FGuid TargetNodeId;
+
+	/** Resolved display name of the target node, shown for editor readability. */
+	UPROPERTY(VisibleAnywhere, Category = "Quest")
+	FName TargetNodeName;
+
+	/** Preconditions required to take this transition. */
+	UPROPERTY(EditAnywhere, Category = "Quest")
+	TArray<struct FQuestCondition> Preconditions;
+};
 
 UCLASS()
-class QUESTFORGEEDITOR_API UQuestNodeDetailsProxy : public UObject
+class QUESTFORGEEDITOR_API UQuestNodeEditorProxy : public UObject
 {
 	GENERATED_BODY()
 
@@ -28,7 +46,7 @@ public:
 
 	/* The outgoing transitions from this quest node. */
 	UPROPERTY(EditAnywhere, Category="Quest")
-	TArray<struct FQuestTransition> Transitions;
+	TArray<FQuestTransitionEditorData> Transitions;
 
 	/* The effects applied when this quest node is reached. */
 	UPROPERTY(EditAnywhere, Category="Quest")

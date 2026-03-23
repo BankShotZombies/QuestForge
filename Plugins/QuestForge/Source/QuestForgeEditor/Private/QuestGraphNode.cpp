@@ -40,6 +40,7 @@ void UQuestGraphNode::SyncNodePositionToAsset() const
 		return;
 	}
 
+	// Persist the editor-only graph coordinates back onto the quest asset so layout survives closing and reopening the custom editor.
 	if(FQuestNode* Node = QuestAsset->FindNodeById(NodeId))
 	{
 		Node->EditorPosition = FVector2D(NodePosX, NodePosY);
@@ -76,6 +77,7 @@ void UQuestGraphNode::SyncTransitionsToAsset()
 			continue;
 		}
 
+		// Ignore self-links so we only serialize meaningful progression edges.
 		if(TargetNode->NodeId == NodeId)
 		{
 			continue;
