@@ -23,10 +23,10 @@ public:
 	FName FactName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	EQuestCompareOp	Op;
+	EQuestCompareOp	Op = EQuestCompareOp::Equal;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 Value;
+	int32 Value = 0;
 };
 
 USTRUCT(BlueprintType)
@@ -51,7 +51,7 @@ public:
 	FName FactName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 Value;
+	int32 Value = 0;
 };
 
 USTRUCT(BlueprintType)
@@ -66,7 +66,7 @@ public:
 	FName NodeName;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Quest")
-	FGuid NodeId;
+	FGuid NodeId = FGuid();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	TArray<FQuestTransition> Transitions;

@@ -3,6 +3,9 @@
 #include "QuestForgeEditorModule.h"
 
 #include "AssetTypeActions_QuestAsset.h"
+#include "FQuestForgeSerializer.h"
+#include "WorldStateAsset.h"
+#include "QuestAsset.h"
 
 #define LOCTEXT_NAMESPACE "FQuestForgeModule"
 
@@ -14,6 +17,13 @@ void FQuestForgeEditorModule::StartupModule()
 
 	QuestAssetTypeActions = MakeShared<FAssetTypeActions_QuestAsset>();
 	AssetTools.RegisterAssetTypeActions(QuestAssetTypeActions.ToSharedRef());
+
+	/*UQuestAsset* QuestAsset = LoadObject<UQuestAsset>(nullptr, TEXT("/Game/QuestForgeDemo/Quests/MissingDaughter"));
+	if(QuestAsset)
+	{
+		FString Json = FQuestForgeSerializer::SerializeQuestAsset(QuestAsset);
+		UE_LOG(LogTemp, Warning, TEXT("\n%s"), *Json);
+	}*/
 }
 
 void FQuestForgeEditorModule::ShutdownModule()
